@@ -1,3 +1,4 @@
+import ast
 import typing as t
 import warnings
 from numbers import Number
@@ -11,6 +12,11 @@ def apply_weights(
     df: pd.DataFrame, min_weight: t.Union[int, Number] = -3
 ) -> None:
     """
+
+    df is modified in place.
+
+    Required columns of df are "type", "onset", "release", and "other".
+
     For `min_weight`, see the documentation of Meter.
 
     >>> df = pd.DataFrame({
@@ -56,10 +62,17 @@ def apply_weights(
     8     0.0    4.0      6.0                                 NaN             bar     NaN
     9    67.0    4.0      5.0                                 NaN            note     1.0
     10   64.0    5.0      6.0                                 NaN            note     0.0
+
+    The score doesn't have to start with a barline but if it doesn't then we
+    assume that it begins with a full measure (rather than a pickup) which
+    could lead to the entire subsequent piece being misaligned.
     """
     offset = 0
     meter = None
-    bar_onset = None
+    # Previously I initialized bar_onset to None, but we want to handle the case
+    # where the initial barline is omitted
+    bar_onset = 0
+    bar_dur = None
     weights = []
     for _, row in df.iterrows():
         if row.type == "bar":
@@ -71,9 +84,13 @@ def apply_weights(
                     "mid-measure time-signature changes are not supported, skipping"
                 )
                 continue
-            ts_str = f"{row.other['numerator']}/{row.other['denominator']}"
+            ts = row.other
+            if isinstance(ts, str):
+                ts = ast.literal_eval(ts)
+            ts_str = f"{ts['numerator']}/{ts['denominator']}"
             candidate_meter = Meter(ts_str, min_weight)
-            offset = candidate_meter.bar_dur - bar_dur
+            if bar_dur is not None:
+                offset = candidate_meter.bar_dur - bar_dur
             if offset < 0:
                 warnings.warn(
                     "bar is longer than time signature, skipping time signature"

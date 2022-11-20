@@ -13,6 +13,7 @@ from metricker.constants import TIME_TYPE
 
 class TimeClass:
     _ts_dict = MappingProxyType(
+        # Not sure why we don't generate this algorithmically
         {
             "4/2": (4, 2),
             "3/2": (3, 2),
@@ -25,6 +26,9 @@ class TimeClass:
             "4/8": (4, 0.5),
             "3/8": (3, 0.5),
             "2/8": (2, 0.5),
+            "4/16": (4, 0.25),
+            "3/16": (3, 0.25),
+            "2/16": (2, 0.25),
             # NB Fast 3/8 not implemented
             # "3/8": (1, 1.5),
             "6/8": (2, 1.5),
@@ -661,7 +665,7 @@ class Meter(TimeClass):
         [1.0_to_2.0, 2.0_to_4.0]
 
         Note that "odd" durations like the following are not avoided. For that,
-        see TODO
+        see split_odd_duration()
 
         >>> four_four.split_at_metric_strong_points([Dur(0, 3.5)])
         [0.0_to_3.5]
