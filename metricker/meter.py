@@ -15,6 +15,9 @@ class TimeClass:
     _ts_dict = MappingProxyType(
         # Not sure why we don't generate this algorithmically
         {
+            "4/1": (4, 4),
+            "3/1": (3, 4),
+            "2/1": (2, 4),
             "4/2": (4, 2),
             "3/2": (3, 2),
             "2/2": (2, 2),
@@ -80,6 +83,9 @@ class MeterError(Exception):
 
 class Meter(TimeClass):
     """
+
+    Highest possible weight is 2, which only occurs in some meters.
+
     >>> four_four = Meter("4/4")
     >>> four_four.beat_dur
     Fraction(1, 1)

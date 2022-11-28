@@ -15,6 +15,8 @@ def apply_weights(
 
     df is modified in place.
 
+    The highest weight is 2.
+
     Required columns of df are "type", "onset", "release", and "other".
 
     For `min_weight`, see the documentation of Meter.
