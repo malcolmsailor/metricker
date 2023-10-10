@@ -1,11 +1,10 @@
-from copy import copy
 import math
-from numbers import Number
 import operator
-
 import typing as t
-
+from copy import copy
+from fractions import Fraction
 from functools import cached_property
+from numbers import Number
 from types import MappingProxyType
 
 from metricker.constants import TIME_TYPE
@@ -60,8 +59,8 @@ class TimeClass:
 
     @staticmethod
     def _first_after(
-        threshold: Number,
-        grid_length: Number,
+        threshold: t.Union[float, Fraction],
+        grid_length: t.Union[float, Fraction],
         inclusive: bool = True,
     ):
         """
@@ -175,9 +174,7 @@ class Meter(TimeClass):
         self._semibeat_dur = (
             self._beat_dur / 3 if self._compound else self._beat_dur / 2
         )
-        self._superbeat_dur = (
-            self._beat_dur * 3 if self._triple else self._beat_dur * 2
-        )
+        self._superbeat_dur = self._beat_dur * 3 if self._triple else self._beat_dur * 2
         self._weight_memo = {}
         self._odd_memo: t.Dict[Number, bool] = {}
         if isinstance(min_weight, int):
@@ -574,10 +571,10 @@ class Meter(TimeClass):
         >>> nine_eight.get_onset_of_greatest_weight_between(4.5, 9.0)
         (Fraction(9, 2), 1)
         >>> nine_eight.get_onset_of_greatest_weight_between(
-        ...     4.5, 9.0, include_start=False)
+        ...     4.5, 9.0, include_start=False
+        ... )
         (Fraction(15, 2), 0)
-        >>> nine_eight.get_onset_of_greatest_weight_between(
-        ...     4.5, 9.0, include_stop=True)
+        >>> nine_eight.get_onset_of_greatest_weight_between(4.5, 9.0, include_stop=True)
         (Fraction(9, 1), 1)
 
         If `return_first` is True, then in the event of a tie (which can occur
@@ -585,11 +582,9 @@ class Meter(TimeClass):
         divisions), we take the first item. Otherwise, if there are two items,
         we take the second one.
 
-        >>> nine_eight.get_onset_of_greatest_weight_between(
-        ...     0.5, 1.5)
+        >>> nine_eight.get_onset_of_greatest_weight_between(0.5, 1.5)
         (Fraction(1, 1), -1)
-        >>> nine_eight.get_onset_of_greatest_weight_between(
-        ...     0.5, 1.5, return_first=True)
+        >>> nine_eight.get_onset_of_greatest_weight_between(0.5, 1.5, return_first=True)
         (Fraction(1, 2), -1)
 
         If the interval is several measures or more long, there may be a tie
@@ -598,13 +593,16 @@ class Meter(TimeClass):
         downbeat (if there are an even number).
 
         >>> nine_eight.get_onset_of_greatest_weight_between(
-        ...     0.0, 13.5) # first 3 measures, returns downbeat of measure 2
+        ...     0.0, 13.5
+        ... )  # first 3 measures, returns downbeat of measure 2
         (Fraction(9, 2), 1)
         >>> nine_eight.get_onset_of_greatest_weight_between(
-        ...     0.0, 18.0) # first 4 measures, returns downbeat of measure 3
+        ...     0.0, 18.0
+        ... )  # first 4 measures, returns downbeat of measure 3
         (Fraction(9, 1), 1)
         >>> nine_eight.get_onset_of_greatest_weight_between(
-        ...     0.0, 18.0, return_first=True) # returns downbeat of measure 1
+        ...     0.0, 18.0, return_first=True
+        ... )  # returns downbeat of measure 1
         (Fraction(0, 1), 1)
         """
         for weight in range(self.max_weight, self._min_weight - 1, -1):
@@ -652,10 +650,12 @@ class Meter(TimeClass):
         ...
         ...     def __eq__(self, other):
         ...         return self.onset == other.onset and self.release == other.release
+        ...
 
         >>> four_four = Meter("4/4")
         >>> four_four.split_at_metric_strong_points(
-        ...     [Dur(0, 9), Dur(9, 14), Dur(14, 18)])
+        ...     [Dur(0, 9), Dur(9, 14), Dur(14, 18)]
+        ... )
         [0.0_to_4.0, 4.0_to_8.0, 8.0_to_9.0, 9.0_to_10.0, 10.0_to_12.0, 12.0_to_14.0, 14.0_to_16.0, 16.0_to_18.0]
 
         The leading portion will be split recursively down to `min_split_dur`
@@ -663,11 +663,9 @@ class Meter(TimeClass):
 
         >>> four_four.split_at_metric_strong_points([Dur(0.25, 2)])
         [0.25_to_0.5, 0.5_to_1.0, 1.0_to_2.0]
-        >>> four_four.split_at_metric_strong_points([Dur(0.25, 2)],
-        ...     min_split_dur=1.0)
+        >>> four_four.split_at_metric_strong_points([Dur(0.25, 2)], min_split_dur=1.0)
         [0.25_to_1.0, 1.0_to_2.0]
-        >>> four_four.split_at_metric_strong_points([Dur(1, 4)],
-        ...     min_split_dur=1.0)
+        >>> four_four.split_at_metric_strong_points([Dur(1, 4)], min_split_dur=1.0)
         [1.0_to_2.0, 2.0_to_4.0]
 
         Note that "odd" durations like the following are not avoided. For that,
@@ -679,21 +677,15 @@ class Meter(TimeClass):
         [0.0_to_1.75]
 
         If `force_split` is True, then at least one split will be made.
-        >>> four_four.split_at_metric_strong_points(
-        ...     [Dur(0, 3.5)], force_split=True)
+        >>> four_four.split_at_metric_strong_points([Dur(0, 3.5)], force_split=True)
         [0.0_to_2.0, 2.0_to_3.5]
         """
 
-        def _inner_sub(
-            item: t.Any, at_least_one_split: bool = False
-        ) -> t.List[t.Any]:
+        def _inner_sub(item: t.Any, at_least_one_split: bool = False) -> t.List[t.Any]:
             out = []
             # for item in items:
             start_onset = item.onset
-            if (
-                min_split_dur is not None
-                and item.release - item.onset <= min_split_dur
-            ):
+            if min_split_dur is not None and item.release - item.onset <= min_split_dur:
                 out.append(copy(item))
                 return out
             start_weight = self.weight(item.onset)
@@ -772,6 +764,7 @@ class Meter(TimeClass):
         ...
         ...     def __eq__(self, other):
         ...         return self.onset == other.onset and self.release == other.release
+        ...
 
         >>> four_four = Meter("4/4")
         >>> four_four.split_odd_duration(Dur(0, 1.25))
@@ -801,14 +794,27 @@ class Meter(TimeClass):
         False
         >>> any(
         ...     four_four.duration_is_odd(dur)
-        ...     for dur in (1/4, 1/2, 3/4, 1, 3/2, 2, 3, 4, 6, 8, 32, 96, 512)
+        ...     for dur in (1 / 4, 1 / 2, 3 / 4, 1, 3 / 2, 2, 3, 4, 6, 8, 32, 96, 512)
         ... )
         False
         >>> four_four.duration_is_odd(5)
         True
         >>> all(
         ...     four_four.duration_is_odd(dur)
-        ...     for dur in (5/4, 5/2, 5, 10, 7/4, 7/2, 7, 9/4, 9/2, 9, 13/4, 17/4)
+        ...     for dur in (
+        ...         5 / 4,
+        ...         5 / 2,
+        ...         5,
+        ...         10,
+        ...         7 / 4,
+        ...         7 / 2,
+        ...         7,
+        ...         9 / 4,
+        ...         9 / 2,
+        ...         9,
+        ...         13 / 4,
+        ...         17 / 4,
+        ...     )
         ... )
         True
 
