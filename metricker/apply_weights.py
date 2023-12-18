@@ -34,7 +34,7 @@ def apply_weights(df: pd.DataFrame, min_weight: t.Union[int, Number] = -3) -> No
     ...     }
     ... )
     >>> apply_weights(df)
-    >>> df
+    >>> df[["pitch", "onset", "release", "other", "type", "weight"]]
        pitch  onset  release                               other            type  weight
     0    NaN   0.00      NaN  {'numerator': 3, 'denominator': 4}  time_signature     NaN
     1    0.0   0.00      3.0                                 NaN             bar     NaN
@@ -68,7 +68,7 @@ def apply_weights(df: pd.DataFrame, min_weight: t.Union[int, Number] = -3) -> No
     ...     }
     ... )
     >>> apply_weights(df)
-    >>> df
+    >>> df[["pitch", "onset", "release", "other", "type", "weight"]]
         pitch  onset  release                               other            type  weight
     0     NaN    0.0      NaN  {'numerator': 3, 'denominator': 4}  time_signature     NaN
     1     0.0    0.0      1.0                                 NaN             bar     NaN

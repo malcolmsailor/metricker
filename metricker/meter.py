@@ -4,7 +4,6 @@ import typing as t
 from copy import copy
 from fractions import Fraction
 from functools import cached_property
-from numbers import Number
 from types import MappingProxyType
 
 from metricker.constants import TIME_TYPE
@@ -48,11 +47,13 @@ class TimeClass:
 
     @classmethod
     @property
-    def available_time_signatures(cls) -> t.Tuple[str]:
+    def available_time_signatures(cls) -> t.Tuple[str, ...]:
         return tuple(cls._ts_dict.keys())
 
     @staticmethod
-    def _get_bounds(onset=None, release=None):
+    def _get_bounds(
+        onset: float | Fraction | None = None, release: float | Fraction | None = None
+    ) -> tuple[float | Fraction, float | Fraction | None]:
         if onset is None:
             onset = TIME_TYPE(0)
         return onset, release
@@ -151,7 +152,7 @@ class Meter(TimeClass):
     def __repr__(self):
         return f"{self.__class__.__name__}('{self._ts_str}')"
 
-    def __init__(self, ts_str: str, min_weight: t.Union[int, Number] = -3):
+    def __init__(self, ts_str: str, min_weight: t.Union[int, float | Fraction] = -3):
         """
         If min_weight is an int, it specifies the min_weight directly.
         >>> meter1 = Meter("4/2", min_weight=-4)
@@ -176,7 +177,7 @@ class Meter(TimeClass):
         )
         self._superbeat_dur = self._beat_dur * 3 if self._triple else self._beat_dur * 2
         self._weight_memo = {}
-        self._odd_memo: t.Dict[Number, bool] = {}
+        self._odd_memo: t.Dict[float | Fraction, bool] = {}
         if isinstance(min_weight, int):
             self._min_weight = min_weight
         else:
@@ -475,14 +476,17 @@ class Meter(TimeClass):
 
     def weights_between(
         self,
-        grid_length: Number,
-        onset: Number,
-        release: Number,
+        grid_length: float | Fraction,
+        onset: float | Fraction,
+        release: float | Fraction,
         include_start: bool = True,
         include_end: bool = False,
         out_format: str = "list",
         include_releases: bool = False,
-    ) -> t.Union[t.Dict[Number, Number], t.List[t.Dict[str, Number]]]:
+    ) -> t.Union[
+        t.Dict[float | Fraction, float | Fraction],
+        t.List[t.Dict[str, float | Fraction]],
+    ]:
         """
         >>> two_four = Meter("2/4")
         >>> two_four.weights_between(0.5, 0.5, 1.5)
@@ -496,12 +500,13 @@ class Meter(TimeClass):
             raise ValueError(
                 "`include_releases` only valid with `out_format` == 'list'"
             )
-        onset, release = self._get_bounds(onset, release)
+        onset, release = self._get_bounds(onset, release)  # type:ignore
+        assert release is not None
         time = self._first_after(onset, grid_length, inclusive=include_start)
         out = {} if out_format == "dict" else []
         op = operator.le if include_end else operator.lt
         while op(time, release):
-            if out_format == "dict":
+            if isinstance(out, dict):
                 out[time] = self(time)
             elif include_releases:
                 out.append(
@@ -518,13 +523,16 @@ class Meter(TimeClass):
 
     def onsets_between(
         self,
-        start: Number,
-        stop: Number,
+        start: float | Fraction,
+        stop: float | Fraction,
         min_weight: int,
         include_start: bool = True,
         include_stop: bool = False,
         out_format: str = "list",
-    ) -> t.Union[t.Dict[Number, Number], t.List[t.Dict[str, Number]]]:
+    ) -> t.Union[
+        t.Dict[float | Fraction, float | Fraction],
+        t.List[t.Dict[str, float | Fraction]],
+    ]:
         """
         >>> two_four = Meter("2/4")
         >>> two_four.onsets_between(0, 1, -2, out_format="dict")
@@ -549,19 +557,19 @@ class Meter(TimeClass):
     def superbeats_between(self, *args, **kwargs):
         return self.weights_between(self._superbeat_dur, *args, **kwargs)
 
-    def beat_after(self, time: Number, inclusive: bool = True):
+    def beat_after(self, time: float | Fraction, inclusive: bool = True):
         return self._first_after(time, self.beat_dur, inclusive=inclusive)
 
-    def semibeat_after(self, time: Number, inclusive: bool = True):
+    def semibeat_after(self, time: float | Fraction, inclusive: bool = True):
         return self._first_after(time, self.semibeat_dur, inclusive=inclusive)
 
-    def superbeat_after(self, time: Number, inclusive: bool = True):
+    def superbeat_after(self, time: float | Fraction, inclusive: bool = True):
         return self._first_after(time, self.superbeat_dur, inclusive=inclusive)
 
     def get_onset_of_greatest_weight_between(
         self,
-        start: Number,
-        stop: Number,
+        start: float | Fraction,
+        stop: float | Fraction,
         include_start: bool = True,
         include_stop: bool = False,
         return_first: bool = False,
@@ -605,6 +613,7 @@ class Meter(TimeClass):
         ... )  # returns downbeat of measure 1
         (Fraction(0, 1), 1)
         """
+        onsets = None
         for weight in range(self.max_weight, self._min_weight - 1, -1):
             grid = self.weight_to_grid[weight]
             onsets = self.weights_between(
@@ -622,17 +631,18 @@ class Meter(TimeClass):
                 f"no onsets between {start} and {stop} with weight greater "
                 f"than self.min_weight={self.min_weight}"
             )
+        assert isinstance(onsets, list)
         if len(onsets) == 1 or return_first:
-            return tuple(onsets[0].values())
+            return tuple(onsets[0].values())  # type:ignore
         if len(onsets) > 2:
             assert all(onset["weight"] == self.max_weight for onset in onsets)
-            return tuple(onsets[math.floor(len(onsets) / 2)].values())
-        return tuple(onsets[1].values())
+            return tuple(onsets[math.floor(len(onsets) / 2)].values())  # type:ignore
+        return tuple(onsets[1].values())  # type:ignore
 
     def split_at_metric_strong_points(
         self,
         items: t.List[t.Any],
-        min_split_dur: t.Optional[Number] = None,
+        min_split_dur: t.Optional[float | Fraction] = None,
         force_split: bool = False,
     ) -> t.List[t.Any]:
         """
@@ -747,7 +757,7 @@ class Meter(TimeClass):
         return result
 
     def split_odd_duration(
-        self, item: t.Any, min_split_dur: t.Optional[Number] = None
+        self, item: t.Any, min_split_dur: t.Optional[float | Fraction] = None
     ) -> t.List[t.Any]:
         """
         Items in input list must have mutable "onset" and "release" attributes
@@ -780,7 +790,7 @@ class Meter(TimeClass):
             [item], min_split_dur=min_split_dur, force_split=True
         )
 
-    def duration_is_odd(self, duration: Number) -> bool:
+    def duration_is_odd(self, duration: float | Fraction) -> bool:
         """
 
         "Odd" durations are difficult to describe. In purely duple (i.e.,
@@ -820,6 +830,10 @@ class Meter(TimeClass):
 
         >>> nine_four = Meter("9/4")
         >>> nine_four.duration_is_odd(9)
+        False
+
+        >>> six_four = Meter("6/4")
+        >>> six_four.duration_is_odd(5)
         False
 
         Will raise a ValueError if called on a duration at less than the

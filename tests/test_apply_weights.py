@@ -1,7 +1,7 @@
 import os
 import random
 
-from xml_to_note_table.parser import parse as xml_parse
+from music_df.xml_parser import xml_parse
 
 from metricker.apply_weights import apply_weights
 
