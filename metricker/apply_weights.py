@@ -97,7 +97,6 @@ def apply_weights(df: pd.DataFrame, min_weight: t.Union[int, Number] = -3) -> No
     # drop _merge_ column from time_sigs_wo_bars
     time_sigs_wo_bars = time_sigs_wo_bars.drop(columns="_merge")
     for _, time_sig in time_sigs_wo_bars.iterrows():
-        breakpoint()
         LOGGER.warning(
             "mid-measure time-signature not supported, time signature will take "
             f"effect at next measure: {time_sig}"
