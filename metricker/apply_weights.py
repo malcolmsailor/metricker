@@ -1,8 +1,8 @@
 import ast
+from fractions import Fraction
 import logging
-import typing as t
+from typing import Union, Literal
 import warnings
-from numbers import Number
 
 import pandas as pd
 
@@ -11,12 +11,29 @@ from metricker.meter import Meter
 LOGGER = logging.getLogger(__name__)
 
 
-def apply_weights(df: pd.DataFrame, min_weight: t.Union[int, Number] = -3) -> None:
+def apply_weights(
+    df: pd.DataFrame,
+    min_weight: Union[int, float, Fraction] = -3,
+    weight_scheme: Literal[
+        "heavy_downbeats", "light_downbeats", "variable_downbeats"
+    ] = "variable_downbeats",
+) -> None:
     """
 
     df is modified in place.
 
-    The highest weight is 2.
+    The highest weight is 2 with the default weight scheme.
+
+    For `weight_scheme`, we give an example:
+    - "heavy_downbeats":
+        - 2/4: `2 -1 0 -1`
+            - 4/4: `2 -1 0 -1 1 -1 0 -1`
+    - "light_downbeats":
+        - 2/4: `1 -1 0 -1`
+        - 4/4: `1 -1 0 -1 1 -1 0 -1`
+    - "variable_downbeats":
+        - 2/4: `1 -1 0 -1`
+        - 4/4: `2 -1 0 -1 1 -1 0 -1`
 
     Required columns of df are "type", "onset", "release", and "other".
 
@@ -86,10 +103,10 @@ def apply_weights(df: pd.DataFrame, min_weight: t.Union[int, Number] = -3) -> No
     assume that it begins with a full measure (rather than a pickup) which
     could lead to the entire subsequent piece being misaligned.
     """
-
     # Find mid-measure time signatures (time signatures that don't co-occur
     #   with a barline)
     bars = df[df["type"] == "bar"]
+    assert not bars["release"].isna().any(), "Bars must have explicit non-nan release"
     time_sigs = df[df["type"] == "time_signature"]
     merged = time_sigs.merge(bars[["onset"]], on="onset", how="left", indicator=True)
     time_sigs_wo_bars = merged[merged["_merge"] == "left_only"]
@@ -109,6 +126,25 @@ def apply_weights(df: pd.DataFrame, min_weight: t.Union[int, Number] = -3) -> No
     # where the initial barline is omitted
     bar_dur = None
     weights = []
+
+    if weight_scheme == "heavy_downbeats":
+        max_weight = 2
+        bar_has_max_weight = True
+    elif weight_scheme == "light_downbeats":
+        max_weight = 1
+        bar_has_max_weight = True
+    elif weight_scheme == "variable_downbeats":
+        max_weight = 2
+        bar_has_max_weight = False
+    else:
+        raise ValueError
+
+    init_meter = lambda ts_str: Meter(
+        ts_str,
+        min_weight=min_weight,
+        max_weight=max_weight,
+        bar_has_max_weight=bar_has_max_weight,
+    )
     for _, row in df.iterrows():
         if row.type == "bar":
             bar_dur = row.release - row.onset
@@ -126,7 +162,8 @@ def apply_weights(df: pd.DataFrame, min_weight: t.Union[int, Number] = -3) -> No
             if isinstance(ts, str):
                 ts = ast.literal_eval(ts)
             ts_str = f"{ts['numerator']}/{ts['denominator']}"
-            next_meter = Meter(ts_str, min_weight)
+            # next_meter = Meter(ts_str, min_weight)
+            next_meter = init_meter(ts_str)
             # meter = candidate_meter
         elif row.type == "note":
             assert meter is not None

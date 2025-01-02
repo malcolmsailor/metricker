@@ -5,6 +5,7 @@ from copy import copy
 from fractions import Fraction
 from functools import cached_property
 from types import MappingProxyType
+import warnings
 
 from metricker.constants import TIME_TYPE
 
@@ -84,7 +85,8 @@ class MeterError(Exception):
 class Meter(TimeClass):
     """
 
-    Highest possible weight is 2, which only occurs in some meters.
+    Highest possible weight is 2, which only occurs in some meters, unless we set
+    `bar_has_max_weight` on initialization.
 
     >>> four_four = Meter("4/4")
     >>> four_four.beat_dur
@@ -152,7 +154,13 @@ class Meter(TimeClass):
     def __repr__(self):
         return f"{self.__class__.__name__}('{self._ts_str}')"
 
-    def __init__(self, ts_str: str, min_weight: t.Union[int, float | Fraction] = -3):
+    def __init__(
+        self,
+        ts_str: str,
+        min_weight: t.Union[int, float | Fraction] = -3,
+        max_weight: int = 2,
+        bar_has_max_weight: bool = False,
+    ):
         """
         If min_weight is an int, it specifies the min_weight directly.
         >>> meter1 = Meter("4/2", min_weight=-4)
@@ -163,6 +171,11 @@ class Meter(TimeClass):
         >>> assert meter1.min_weight == meter2.min_weight
         """
         self._ts_str = ts_str
+        self._bar_has_max_weight = bar_has_max_weight
+        if max_weight > 2:
+            warnings.warn(f"Max weight > 2 will have no effect")
+        self._max_weight = max_weight
+
         try:
             n_beats, beat_dur = self._ts_dict[ts_str]
         except KeyError:
@@ -462,8 +475,12 @@ class Meter(TimeClass):
     def weight(self, time):
         time = TIME_TYPE(time)
         time %= self._total_dur
+
         if time in self._weight_memo:
             return self._weight_memo[time]
+
+        if self._bar_has_max_weight and time == 0:
+            return self._max_weight
 
         if self._compound:
             out = self._compound_weight(time)
@@ -471,7 +488,11 @@ class Meter(TimeClass):
             out = self._triple_weight(time)
         else:
             out = self._duple_weight(time)
+
+        out = min(self._max_weight, out)
+
         self._weight_memo[time] = out
+
         return out
 
     def weights_between(
